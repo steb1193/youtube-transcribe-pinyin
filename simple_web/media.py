@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 VIDEO_EXT = {
@@ -40,6 +42,17 @@ class MediaError(RuntimeError):
     pass
 
 
+def _bin(name: str) -> str:
+    path = shutil.which(name)
+    if not path:
+        raise MediaError(f"В образе нет {name}. Нужны ffmpeg и yt-dlp.")
+    return path
+
+
+def _yt_dlp() -> list[str]:
+    return [sys.executable, "-m", "yt_dlp"]
+
+
 def _run(cmd: list[str], timeout: int = 600) -> subprocess.CompletedProcess[str]:
     try:
         proc = subprocess.run(
@@ -62,7 +75,7 @@ def _run(cmd: list[str], timeout: int = 600) -> subprocess.CompletedProcess[str]
 def duration_sec(path: Path) -> float:
     proc = _run(
         [
-            "ffprobe",
+            _bin("ffprobe"),
             "-v",
             "error",
             "-show_entries",
@@ -84,7 +97,7 @@ def to_wav(src: Path, dst: Path) -> Path:
     dst.parent.mkdir(parents=True, exist_ok=True)
     _run(
         [
-            "ffmpeg",
+            _bin("ffmpeg"),
             "-y",
             "-i",
             str(src),
@@ -109,7 +122,7 @@ def split_wav(src: Path, chunk_sec: int, dest: Path) -> list[Path]:
     pattern = dest / "chunk_%03d.wav"
     _run(
         [
-            "ffmpeg",
+            _bin("ffmpeg"),
             "-y",
             "-i",
             str(src),
@@ -140,7 +153,7 @@ def download_source(url: str, dest: Path, cookies: Path | None = None) -> Path:
     dest.mkdir(parents=True, exist_ok=True)
     outtmpl = str(dest / "source.%(ext)s")
     cmd = [
-        "yt-dlp",
+        *_yt_dlp(),
         "-f",
         "bestaudio/best",
         "-x",
@@ -156,7 +169,7 @@ def download_source(url: str, dest: Path, cookies: Path | None = None) -> Path:
         url,
     ]
     if cookies and cookies.is_file():
-        cmd[1:1] = ["--cookies", str(cookies)]
+        cmd[-1:-1] = ["--cookies", str(cookies)]
     _run(cmd, timeout=1200)
     path = newest_file(dest)
     if path is None:

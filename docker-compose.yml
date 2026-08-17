@@ -5,7 +5,7 @@ services:
     build:
       context: ./simple_web
       dockerfile: Dockerfile
-    image: youtube-transcribe-pinyin:local
+    image: stepan0/youtube-transcribe-pinyin:latest
     container_name: youtube-transcribe-pinyin
     restart: unless-stopped
     ports:
@@ -21,7 +21,6 @@ services:
       HF_HOME: /models
     volumes:
       - ./downloads:/data
-      - transcribe-models:/models
     shm_size: "4gb"
     gpus: all
     deploy:
@@ -31,6 +30,3 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-
-volumes:
-  transcribe-models:

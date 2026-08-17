@@ -3,8 +3,6 @@ FROM pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
 ENV DEBIAN_FRONTEND=noninteractive \
     PYTHONUNBUFFERED=1 \
     HF_HOME=/models \
-    HUGGINGFACE_HUB_CACHE=/models \
-    TRANSFORMERS_CACHE=/models \
     PORT=8080 \
     HOST=0.0.0.0 \
     DATA_DIR=/data \
@@ -17,14 +15,24 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         git \
         ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && ffmpeg -version \
+    && ffprobe -version
 
 WORKDIR /app
 
 COPY requirements-asr.txt /app/requirements-asr.txt
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r /app/requirements-asr.txt \
-    && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.5.1
+    && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.5.1 \
+    && python -m yt_dlp --version
+
+# Веса в слое образа: на Windows не качать Hugging Face при каждом docker run.
+RUN python -c "from huggingface_hub import snapshot_download; import os; \
+[snapshot_download(repo_id=r) for r in (os.environ['ASR_MODEL'], os.environ['TRANSLATE_MODEL'])]"
+
+ENV HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
 
 COPY engine.py media.py asr_studio.py runtime.py enrich.py translator.py pinyinconv.py /app/
 
