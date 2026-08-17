@@ -1,4 +1,4 @@
-"""Локальный LLM-перевод на русский. 7B в 4-bit — заметно сильнее 1.5B."""
+"""Специализированный перевод на русский: Tencent Hy-MT2-7B."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import torch
 
 from runtime import gpu_lock
 
-MODEL_ID = os.environ.get("TRANSLATE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
-BATCH = int(os.environ.get("TRANSLATE_BATCH", "2"))
+MODEL_ID = os.environ.get("TRANSLATE_MODEL", "tencent/Hy-MT2-7B")
+BATCH = int(os.environ.get("TRANSLATE_BATCH", "1"))
 
 _lock = threading.Lock()
 _loaded = threading.Event()
@@ -21,6 +21,40 @@ _ready = False
 _loading = False
 _error: str | None = None
 _device = "cpu"
+
+# Полные английские имена, как требует Hy-MT2.
+_LANG = {
+    "chinese": "Chinese",
+    "mandarin": "Chinese",
+    "cantonese": "Cantonese",
+    "yue": "Cantonese",
+    "english": "English",
+    "russian": "Russian",
+    "japanese": "Japanese",
+    "korean": "Korean",
+    "german": "German",
+    "french": "French",
+    "spanish": "Spanish",
+    "italian": "Italian",
+    "portuguese": "Portuguese",
+    "arabic": "Arabic",
+    "turkish": "Turkish",
+    "thai": "Thai",
+    "vietnamese": "Vietnamese",
+    "indonesian": "Indonesian",
+    "hindi": "Hindi",
+    "polish": "Polish",
+    "dutch": "Dutch",
+    "ukrainian": "Ukrainian",
+    "czech": "Czech",
+    "persian": "Persian",
+    "hebrew": "Hebrew",
+    "zh": "Chinese",
+    "en": "English",
+    "ja": "Japanese",
+    "ko": "Korean",
+    "ru": "Russian",
+}
 
 
 def status() -> dict:
@@ -47,7 +81,7 @@ def load_model() -> None:
     if wait:
         _loaded.wait()
         if not _ready:
-            raise RuntimeError(_error or "Не удалось загрузить LLM перевода")
+            raise RuntimeError(_error or "Не удалось загрузить Hy-MT2")
         return
 
     try:
@@ -118,43 +152,76 @@ def _model_device():
     return next(_model.parameters()).device
 
 
+def _src_name(src_lang: str) -> str:
+    key = (src_lang or "").strip().lower()
+    if key in _LANG:
+        return _LANG[key]
+    for token, name in _LANG.items():
+        if token in key:
+            return name
+    return src_lang.strip() or "the source language"
+
+
+def _is_cjk_src(src_lang: str) -> bool:
+    name = _src_name(src_lang).lower()
+    return name in ("chinese", "cantonese") or bool(re.search(r"[\u4e00-\u9fff]", src_lang or ""))
+
+
+def _prompt(text: str, src_lang: str) -> str:
+    # Hy-MT2: без system prompt, полные имена языков, только перевод.
+    if _is_cjk_src(src_lang):
+        return (
+            "将以下文本翻译为俄语，注意**只需要输出翻译后的结果，不要额外解释**：\n\n"
+            f"{text}"
+        )
+    return (
+        "Translate the following text into Russian. "
+        "Note that you should **only output the translated result without any additional explanation**:\n\n"
+        f"{text}"
+    )
+
+
 def _generate(prompt_user: str, max_new_tokens: int) -> str:
     if not _ready:
         load_model()
-    messages = [
-        {
-            "role": "system",
-            "content": (
-                "Ты профессиональный переводчик на русский. "
-                "Переводи естественно, сохраняй смысл и тон, без транслита. "
-                "Отвечай только переводом: без кавычек, пояснений и нумерации."
-            ),
-        },
-        {"role": "user", "content": prompt_user},
-    ]
-    text = _tokenizer.apply_chat_template(
-        messages,
-        tokenize=False,
-        add_generation_prompt=True,
-    )
-    inputs = _tokenizer([text], return_tensors="pt")
-    inputs = {k: v.to(_model_device()) for k, v in inputs.items()}
+    messages = [{"role": "user", "content": prompt_user}]
+    try:
+        encoded = _tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_tensors="pt",
+            return_dict=True,
+        )
+    except TypeError:
+        ids = _tokenizer.apply_chat_template(
+            messages,
+            add_generation_prompt=True,
+            tokenize=True,
+            return_tensors="pt",
+        )
+        encoded = {"input_ids": ids}
+    if hasattr(encoded, "items"):
+        inputs = {k: v.to(_model_device()) for k, v in encoded.items()}
+    else:
+        inputs = {"input_ids": encoded.to(_model_device())}
+    pad = _tokenizer.eos_token_id
     with gpu_lock, torch.no_grad():
         out = _model.generate(
             **inputs,
             max_new_tokens=max_new_tokens,
             do_sample=False,
-            pad_token_id=_tokenizer.eos_token_id,
+            repetition_penalty=1.05,
+            pad_token_id=pad,
         )
-    prompt_len = inputs["input_ids"].shape[1]
+    prompt_len = inputs["input_ids"].shape[-1]
     decoded = _tokenizer.decode(out[0][prompt_len:], skip_special_tokens=True)
     return decoded.strip().strip("«»\"'")
 
 
 def translate_one(sentence: str, src_lang: str) -> str:
-    src = src_lang or "unknown"
     tokens = min(768, max(96, len(sentence) * 3))
-    return _generate(f"Язык оригинала: {src}\n\n{sentence}", tokens)
+    return _generate(_prompt(sentence, src_lang), tokens)
 
 
 def _parse_lines(raw: str, expected: int) -> list[str] | None:
@@ -182,14 +249,10 @@ def translate_many(sentences: list[str], src_lang: str, progress=None) -> list[s
         if len(chunk) == 1:
             out.append(translate_one(chunk[0], src_lang))
             continue
-        numbered = "\n".join(f"{i}. {s}" for i, s in enumerate(chunk, start=1))
+        numbered = "\n".join(chunk)
         raw = _generate(
-            (
-                f"Язык оригинала: {src_lang or 'unknown'}. "
-                f"Переведи каждое предложение на русский. "
-                f"Верни ровно {len(chunk)} строк — одна строка на предложение, без номеров.\n\n"
-                f"{numbered}"
-            ),
+            _prompt(numbered, src_lang)
+            + "\n\nKeep the same number of lines as the source.",
             min(1536, 120 * len(chunk) + 96),
         )
         parsed = _parse_lines(raw, len(chunk))

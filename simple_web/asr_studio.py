@@ -444,7 +444,7 @@ def _run_job(job_id: str, url: str, saved: Path | None, language: str, source_na
                     item.pinyin = to_pinyin(item.original) or None
 
             if not russian and sentences:
-                _update(job_id, stage="Перевожу (Qwen2.5-7B)…")
+                _update(job_id, stage="Перевожу (Hy-MT2-7B)…")
                 engine.set_progress("Освобождаю GPU под переводчик…")
                 engine.release_gpu()
                 try:
@@ -510,7 +510,7 @@ def api_status():
     if asr["loading"]:
         stage = "Загружаю Qwen3-ASR-1.7B…"
     elif llm["loading"]:
-        stage = "Загружаю LLM для перевода…"
+        stage = "Загружаю Hy-MT2-7B…"
     else:
         stage = ""
     return jsonify(
