@@ -8,6 +8,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     DATA_DIR=/data \
     ASR_MODEL=Qwen/Qwen3-ASR-1.7B \
     TRANSLATE_MODEL=tencent/Hy-MT2-7B \
+    TRANSLATE_BITS=8 \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 

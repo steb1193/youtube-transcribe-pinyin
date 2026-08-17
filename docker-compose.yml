@@ -16,6 +16,7 @@ services:
       DATA_DIR: /data
       ASR_MODEL: Qwen/Qwen3-ASR-1.7B
       TRANSLATE_MODEL: tencent/Hy-MT2-7B
+      TRANSLATE_BITS: "8"
       ASR_CHUNK_SEC: "480"
       ASR_MAX_NEW_TOKENS: "4096"
       HF_HOME: /models

@@ -12,6 +12,7 @@ from runtime import gpu_lock
 
 MODEL_ID = os.environ.get("TRANSLATE_MODEL", "tencent/Hy-MT2-7B")
 BATCH = int(os.environ.get("TRANSLATE_BATCH", "1"))
+BITS = int(os.environ.get("TRANSLATE_BITS", "8"))
 
 _lock = threading.Lock()
 _loaded = threading.Event()
@@ -88,18 +89,28 @@ def load_model() -> None:
         from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         if torch.cuda.is_available():
-            compute = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-            quant = BitsAndBytesConfig(
-                load_in_4bit=True,
-                bnb_4bit_quant_type="nf4",
-                bnb_4bit_use_double_quant=True,
-                bnb_4bit_compute_dtype=compute,
-            )
-            extra = {
-                "quantization_config": quant,
-                "device_map": "cuda:0",
-            }
-            _device = "cuda:0 (4-bit)"
+            if BITS <= 4:
+                compute = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+                extra = {
+                    "quantization_config": BitsAndBytesConfig(
+                        load_in_4bit=True,
+                        bnb_4bit_quant_type="nf4",
+                        bnb_4bit_use_double_quant=True,
+                        bnb_4bit_compute_dtype=compute,
+                    ),
+                    "device_map": "cuda:0",
+                }
+                _device = "cuda:0 (4-bit)"
+            elif BITS <= 8:
+                extra = {
+                    "quantization_config": BitsAndBytesConfig(load_in_8bit=True),
+                    "device_map": "cuda:0",
+                }
+                _device = "cuda:0 (8-bit)"
+            else:
+                dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+                extra = {"dtype": dtype, "device_map": "cuda:0"}
+                _device = "cuda:0"
         else:
             extra = {
                 "torch_dtype": torch.float32,
