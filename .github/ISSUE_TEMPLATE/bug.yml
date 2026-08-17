@@ -1,0 +1,36 @@
+name: Баг / Bug
+description: Сломан ASR, пиньинь, перевод, Docker, UI
+title: "[bug] "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Что случилось / What happened
+      description: RU нормально. Логи и команды — as-is.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Где / Area
+      options:
+        - Docker / GPU
+        - YouTube / yt-dlp URL
+        - Upload video/audio
+        - ASR / speech-to-text
+        - Pinyin
+        - Translation
+        - UI / LAN
+    validations:
+      required: true
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU / VRAM
+      placeholder: RTX 3060 12GB
+  - type: textarea
+    id: logs
+    attributes:
+      label: docker compose logs
+      render: bash

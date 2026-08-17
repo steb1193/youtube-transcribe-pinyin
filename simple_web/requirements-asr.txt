@@ -1,0 +1,7 @@
+flask>=3.0
+yt-dlp
+qwen-asr
+pypinyin
+pypinyin-dict
+transformers>=4.51.0
+accelerate

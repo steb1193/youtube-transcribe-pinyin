@@ -1,0 +1,16 @@
+name: Идея / Feature
+description: Feature request for YouTube Transcribe Pinyin (ASR, pinyin, translation, UI)
+title: "[feat] "
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Идея / Request
+      description: Зачем, кому, какой сценарий (YouTube / файл / китайский / перевод).
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        Не сюда: новая соцсеть в yt-dlp, облачный API, замена pypinyin на LLM.

@@ -1,0 +1,36 @@
+name: youtube-transcribe-pinyin
+
+services:
+  transcribe:
+    build:
+      context: ./simple_web
+      dockerfile: Dockerfile
+    image: youtube-transcribe-pinyin:local
+    container_name: youtube-transcribe-pinyin
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      HOST: "0.0.0.0"
+      PORT: "8080"
+      DATA_DIR: /data
+      ASR_MODEL: Qwen/Qwen3-ASR-1.7B
+      TRANSLATE_MODEL: Qwen/Qwen2.5-1.5B-Instruct
+      ASR_CHUNK_SEC: "480"
+      ASR_MAX_NEW_TOKENS: "4096"
+      HF_HOME: /models
+    volumes:
+      - ./downloads:/data
+      - transcribe-models:/models
+    shm_size: "4gb"
+    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+volumes:
+  transcribe-models:

@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: yt-dlp (качалка / site support)
+    url: https://github.com/yt-dlp/yt-dlp/issues
+    about: YouTube login, extractor broken, download fails — not YouTube Transcribe Pinyin
+  - name: Qwen3-ASR
+    url: https://github.com/QwenLM/Qwen3-ASR/issues
+    about: Model quality / CUDA inside qwen-asr
