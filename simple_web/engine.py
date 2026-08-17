@@ -94,6 +94,22 @@ def load_model() -> None:
         _loaded.set()
 
 
+def release_gpu() -> None:
+    """Снять ASR с видеопамяти, чтобы влез переводчик побольше."""
+    global _model, _ready
+    with _lock, gpu_lock:
+        if _model is None:
+            return
+        try:
+            del _model
+        except Exception:
+            pass
+        _model = None
+        _ready = False
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+
 def _transcribe_one(audio_path: Path, language: str | None) -> Transcript:
     if not _ready:
         load_model()

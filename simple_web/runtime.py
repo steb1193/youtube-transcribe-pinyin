@@ -5,3 +5,4 @@ from __future__ import annotations
 import threading
 
 gpu_lock = threading.Lock()
+pipeline_lock = threading.Lock()

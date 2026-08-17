@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     HOST=0.0.0.0 \
     DATA_DIR=/data \
     ASR_MODEL=Qwen/Qwen3-ASR-1.7B \
-    TRANSLATE_MODEL=Qwen/Qwen2.5-1.5B-Instruct \
+    TRANSLATE_MODEL=Qwen/Qwen2.5-7B-Instruct \
     NVIDIA_VISIBLE_DEVICES=all \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility
 

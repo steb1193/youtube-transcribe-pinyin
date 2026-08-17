@@ -1,4 +1,4 @@
-"""Локальный LLM-перевод на русский (Qwen Instruct). Кривовато — зато свой."""
+"""Локальный LLM-перевод на русский. 7B в 4-bit — заметно сильнее 1.5B."""
 
 from __future__ import annotations
 
@@ -10,8 +10,8 @@ import torch
 
 from runtime import gpu_lock
 
-MODEL_ID = os.environ.get("TRANSLATE_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
-BATCH = int(os.environ.get("TRANSLATE_BATCH", "4"))
+MODEL_ID = os.environ.get("TRANSLATE_MODEL", "Qwen/Qwen2.5-7B-Instruct")
+BATCH = int(os.environ.get("TRANSLATE_BATCH", "2"))
 
 _lock = threading.Lock()
 _loaded = threading.Event()
@@ -51,24 +51,34 @@ def load_model() -> None:
         return
 
     try:
-        from transformers import AutoModelForCausalLM, AutoTokenizer
+        from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
         if torch.cuda.is_available():
-            dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
-            device_map = "cuda:0"
-            _device = "cuda:0"
+            compute = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+            quant = BitsAndBytesConfig(
+                load_in_4bit=True,
+                bnb_4bit_quant_type="nf4",
+                bnb_4bit_use_double_quant=True,
+                bnb_4bit_compute_dtype=compute,
+            )
+            extra = {
+                "quantization_config": quant,
+                "device_map": "cuda:0",
+            }
+            _device = "cuda:0 (4-bit)"
         else:
-            dtype = torch.float32
-            device_map = "cpu"
+            extra = {
+                "torch_dtype": torch.float32,
+                "device_map": "cpu",
+            }
             _device = "cpu"
 
         with gpu_lock:
             tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, trust_remote_code=True)
             model = AutoModelForCausalLM.from_pretrained(
                 MODEL_ID,
-                torch_dtype=dtype,
-                device_map=device_map,
                 trust_remote_code=True,
+                **extra,
             )
             model.eval()
 
@@ -88,6 +98,26 @@ def load_model() -> None:
         _loaded.set()
 
 
+def release_gpu() -> None:
+    global _model, _tokenizer, _ready
+    with _lock, gpu_lock:
+        if _model is None:
+            return
+        try:
+            del _model
+        except Exception:
+            pass
+        _model = None
+        _tokenizer = None
+        _ready = False
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
+
+def _model_device():
+    return next(_model.parameters()).device
+
+
 def _generate(prompt_user: str, max_new_tokens: int) -> str:
     if not _ready:
         load_model()
@@ -95,8 +125,9 @@ def _generate(prompt_user: str, max_new_tokens: int) -> str:
         {
             "role": "system",
             "content": (
-                "Ты переводчик на русский. Переводи смысл, без транслита. "
-                "Отвечай только переводом, без кавычек, без пояснений и без нумерации."
+                "Ты профессиональный переводчик на русский. "
+                "Переводи естественно, сохраняй смысл и тон, без транслита. "
+                "Отвечай только переводом: без кавычек, пояснений и нумерации."
             ),
         },
         {"role": "user", "content": prompt_user},
@@ -107,7 +138,7 @@ def _generate(prompt_user: str, max_new_tokens: int) -> str:
         add_generation_prompt=True,
     )
     inputs = _tokenizer([text], return_tensors="pt")
-    inputs = {k: v.to(_model.device) for k, v in inputs.items()}
+    inputs = {k: v.to(_model_device()) for k, v in inputs.items()}
     with gpu_lock, torch.no_grad():
         out = _model.generate(
             **inputs,
@@ -122,7 +153,7 @@ def _generate(prompt_user: str, max_new_tokens: int) -> str:
 
 def translate_one(sentence: str, src_lang: str) -> str:
     src = src_lang or "unknown"
-    tokens = min(512, max(64, len(sentence) * 2))
+    tokens = min(768, max(96, len(sentence) * 3))
     return _generate(f"Язык оригинала: {src}\n\n{sentence}", tokens)
 
 
@@ -159,7 +190,7 @@ def translate_many(sentences: list[str], src_lang: str, progress=None) -> list[s
                 f"Верни ровно {len(chunk)} строк — одна строка на предложение, без номеров.\n\n"
                 f"{numbered}"
             ),
-            min(1024, 80 * len(chunk) + 64),
+            min(1536, 120 * len(chunk) + 96),
         )
         parsed = _parse_lines(raw, len(chunk))
         if parsed is None:

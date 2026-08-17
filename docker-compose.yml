@@ -15,7 +15,7 @@ services:
       PORT: "8080"
       DATA_DIR: /data
       ASR_MODEL: Qwen/Qwen3-ASR-1.7B
-      TRANSLATE_MODEL: Qwen/Qwen2.5-1.5B-Instruct
+      TRANSLATE_MODEL: Qwen/Qwen2.5-7B-Instruct
       ASR_CHUNK_SEC: "480"
       ASR_MAX_NEW_TOKENS: "4096"
       HF_HOME: /models

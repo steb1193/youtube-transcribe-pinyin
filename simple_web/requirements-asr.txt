@@ -5,3 +5,4 @@ pypinyin
 pypinyin-dict
 transformers>=4.51.0
 accelerate
+bitsandbytes

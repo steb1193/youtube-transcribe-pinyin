@@ -23,6 +23,7 @@ from enrich import (
 )
 from media import ALLOWED_EXT, MediaError, download_source, to_wav
 from pinyinconv import to_pinyin
+from runtime import pipeline_lock
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", "/data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -430,30 +431,39 @@ def _run_job(job_id: str, url: str, saved: Path | None, language: str, source_na
 
         _update(job_id, stage="Расшифровываю (Qwen3-ASR-1.7B)…")
         engine.set_progress("Расшифровываю…")
-        result = engine.transcribe_wav(wav, language, work)
-        chinese = is_chinese(result.language, result.text)
-        russian = is_russian(result.language, result.text)
-        pieces = split_sentences(result.text, chinese)
-        sentences = [Sentence(original=p) for p in pieces]
-        if chinese:
-            _update(job_id, stage="Пиньинь (pypinyin + CC-CEDICT)…")
-            engine.set_progress("Ставлю пиньинь…")
-            for item in sentences:
-                item.pinyin = to_pinyin(item.original) or None
+        with pipeline_lock:
+            result = engine.transcribe_wav(wav, language, work)
+            chinese = is_chinese(result.language, result.text)
+            russian = is_russian(result.language, result.text)
+            pieces = split_sentences(result.text, chinese)
+            sentences = [Sentence(original=p) for p in pieces]
+            if chinese:
+                _update(job_id, stage="Пиньинь (pypinyin + CC-CEDICT)…")
+                engine.set_progress("Ставлю пиньинь…")
+                for item in sentences:
+                    item.pinyin = to_pinyin(item.original) or None
 
-        if not russian and sentences:
-            _update(job_id, stage="Перевожу локальной LLM…")
-            engine.set_progress("Перевожу…")
-            try:
-                translations = translator.translate_many(
-                    [s.original for s in sentences],
-                    result.language,
-                    progress=engine.set_progress,
-                )
-                for item, translated in zip(sentences, translations):
-                    item.translation = translated
-            except Exception as exc:  # noqa: BLE001
-                engine.set_progress(f"Перевод не вышел: {exc}")
+            if not russian and sentences:
+                _update(job_id, stage="Перевожу (Qwen2.5-7B)…")
+                engine.set_progress("Освобождаю GPU под переводчик…")
+                engine.release_gpu()
+                try:
+                    translations = translator.translate_many(
+                        [s.original for s in sentences],
+                        result.language,
+                        progress=engine.set_progress,
+                    )
+                    for item, translated in zip(sentences, translations):
+                        item.translation = translated
+                except Exception as exc:  # noqa: BLE001
+                    engine.set_progress(f"Перевод не вышел: {exc}")
+                finally:
+                    translator.release_gpu()
+                    engine.set_progress("Возвращаю ASR на GPU…")
+                    try:
+                        engine.load_model()
+                    except Exception:
+                        pass
 
         if chinese:
             mode_label = "пиньинь + перевод по предложениям"
@@ -595,10 +605,6 @@ def _boot_model() -> None:
         engine.load_model()
     except Exception:
         return
-    try:
-        translator.load_model()
-    except Exception:
-        pass
 
 
 if __name__ == "__main__":
