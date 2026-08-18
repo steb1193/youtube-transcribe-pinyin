@@ -16,9 +16,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
         git \
         ca-certificates \
+        curl \
+        unzip \
     && rm -rf /var/lib/apt/lists/* \
     && ffmpeg -version \
     && ffprobe -version
+
+# YouTube: yt-dlp EJS нужен Deno (https://github.com/yt-dlp/yt-dlp/wiki/EJS)
+RUN curl -fsSL https://deno.land/install.sh | DENO_INSTALL=/usr/local sh \
+    && deno --version
 
 WORKDIR /app
 
@@ -26,7 +32,7 @@ COPY requirements-asr.txt /app/requirements-asr.txt
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r /app/requirements-asr.txt \
     && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.5.1 \
-    && python -m yt_dlp --version
+    && python -m yt_dlp --js-runtimes deno --version
 
 # Веса в слое образа: на Windows не качать Hugging Face при каждом docker run.
 RUN python -c "from huggingface_hub import snapshot_download; import os; \

@@ -154,6 +154,8 @@ def download_source(url: str, dest: Path, cookies: Path | None = None) -> Path:
     outtmpl = str(dest / "source.%(ext)s")
     cmd = [
         *_yt_dlp(),
+        "--js-runtimes",
+        "deno",
         "-f",
         "bestaudio/best",
         "-x",
