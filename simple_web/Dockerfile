@@ -10,7 +10,9 @@ ENV DEBIAN_FRONTEND=noninteractive \
     TRANSLATE_MODEL=tencent/Hy-MT2-7B \
     TRANSLATE_BITS=8 \
     NVIDIA_VISIBLE_DEVICES=all \
-    NVIDIA_DRIVER_CAPABILITIES=compute,utility
+    NVIDIA_DRIVER_CAPABILITIES=compute,utility \
+    DENO_INSTALL=/usr/local \
+    PATH="/usr/local/bin:${PATH}"
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
@@ -32,8 +34,10 @@ WORKDIR /app
 COPY requirements-asr.txt /app/requirements-asr.txt
 RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir -r /app/requirements-asr.txt \
+    && pip install --no-cache-dir -U --pre "yt-dlp[default]" \
     && pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cu124 torch==2.5.1 \
-    && python -m yt_dlp --js-runtimes deno --version
+    && test -x /usr/local/bin/deno \
+    && python -m yt_dlp --js-runtimes deno:/usr/local/bin/deno --version
 
 # Веса в слое образа: на Windows не качать Hugging Face при каждом docker run.
 RUN python -c "from huggingface_hub import snapshot_download; import os; \
@@ -42,7 +46,9 @@ RUN python -c "from huggingface_hub import snapshot_download; import os; \
 ENV HF_HUB_OFFLINE=1 \
     TRANSFORMERS_OFFLINE=1
 
-COPY engine.py media.py asr_studio.py runtime.py enrich.py translator.py pinyinconv.py /app/
+COPY engine.py media.py asr_studio.py runtime.py enrich.py translator.py pinyinconv.py entrypoint.sh /app/
+RUN chmod +x /app/entrypoint.sh
 
 EXPOSE 8080
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["python", "asr_studio.py"]

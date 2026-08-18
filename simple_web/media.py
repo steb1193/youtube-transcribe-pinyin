@@ -53,6 +53,19 @@ def _yt_dlp() -> list[str]:
     return [sys.executable, "-m", "yt_dlp"]
 
 
+def _js_runtime() -> str:
+    """yt-dlp EJS: по умолчанию только Deno, Node сам не подхватывается."""
+    deno = shutil.which("deno")
+    if not deno:
+        for candidate in ("/usr/local/bin/deno", "/root/.deno/bin/deno"):
+            if Path(candidate).is_file():
+                deno = candidate
+                break
+    if deno:
+        return f"deno:{deno}"
+    return "deno"
+
+
 def _run(cmd: list[str], timeout: int = 600) -> subprocess.CompletedProcess[str]:
     try:
         proc = subprocess.run(
@@ -155,7 +168,7 @@ def download_source(url: str, dest: Path, cookies: Path | None = None) -> Path:
     cmd = [
         *_yt_dlp(),
         "--js-runtimes",
-        "deno",
+        _js_runtime(),
         "-f",
         "bestaudio/best",
         "-x",
