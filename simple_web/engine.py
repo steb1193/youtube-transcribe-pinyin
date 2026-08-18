@@ -1,4 +1,4 @@
-"""Qwen3-ASR-1.7B: загрузка модели и расшифровка (с нарезкой длинных дорожек)."""
+"""Qwen3-ASR-1.7B-hf: нативный transformers, нарезка длинных дорожек."""
 
 from __future__ import annotations
 
@@ -12,13 +12,14 @@ import torch
 from media import duration_sec, split_wav
 from runtime import gpu_lock
 
-MODEL_ID = os.environ.get("ASR_MODEL", "Qwen/Qwen3-ASR-1.7B")
+MODEL_ID = os.environ.get("ASR_MODEL", "Qwen/Qwen3-ASR-1.7B-hf")
 CHUNK_SEC = int(os.environ.get("ASR_CHUNK_SEC", "480"))
 MAX_NEW_TOKENS = int(os.environ.get("ASR_MAX_NEW_TOKENS", "4096"))
 
 _lock = threading.Lock()
 _loaded = threading.Event()
 _model = None
+_processor = None
 _ready = False
 _loading = False
 _error: str | None = None
@@ -45,7 +46,7 @@ def status() -> dict:
 
 
 def load_model() -> None:
-    global _model, _ready, _loading, _error
+    global _model, _processor, _ready, _loading, _error
     wait = False
     with _lock:
         if _ready:
@@ -62,7 +63,7 @@ def load_model() -> None:
         return
 
     try:
-        from qwen_asr import Qwen3ASRModel
+        from transformers import AutoModelForMultimodalLM, AutoProcessor
 
         if torch.cuda.is_available():
             dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
@@ -72,14 +73,15 @@ def load_model() -> None:
             device_map = "cpu"
 
         with gpu_lock:
-            model = Qwen3ASRModel.from_pretrained(
+            processor = AutoProcessor.from_pretrained(MODEL_ID)
+            model = AutoModelForMultimodalLM.from_pretrained(
                 MODEL_ID,
                 dtype=dtype,
                 device_map=device_map,
-                max_inference_batch_size=1,
-                max_new_tokens=MAX_NEW_TOKENS,
             )
+            model.eval()
         with _lock:
+            _processor = processor
             _model = model
             _ready = True
             _error = None
@@ -96,30 +98,57 @@ def load_model() -> None:
 
 def release_gpu() -> None:
     """Снять ASR с видеопамяти, чтобы влез переводчик побольше."""
-    global _model, _ready
+    global _model, _processor, _ready
     with _lock, gpu_lock:
-        if _model is None:
+        if _model is None and _processor is None:
             return
         try:
             del _model
         except Exception:
             pass
+        try:
+            del _processor
+        except Exception:
+            pass
         _model = None
+        _processor = None
         _ready = False
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
+
+
+def _parse_generated(generated_ids) -> Transcript:
+    parsed = _processor.decode(generated_ids, return_format="parsed")
+    if isinstance(parsed, list):
+        parsed = parsed[0] if parsed else {}
+    if isinstance(parsed, dict):
+        text = str(parsed.get("transcription") or "").strip()
+        detected = str(parsed.get("language") or "").strip()
+        return Transcript(language=detected, text=text)
+    text = _processor.decode(generated_ids, return_format="transcription_only")
+    if isinstance(text, list):
+        text = text[0] if text else ""
+    return Transcript(language="", text=str(text or "").strip())
 
 
 def _transcribe_one(audio_path: Path, language: str | None) -> Transcript:
     if not _ready:
         load_model()
     lang = None if language in (None, "", "auto") else language
-    with _lock, gpu_lock:
-        results = _model.transcribe(audio=str(audio_path), language=lang)
-    result = results[0]
-    text = (getattr(result, "text", None) or "").strip()
-    detected = str(getattr(result, "language", None) or "")
-    return Transcript(language=detected, text=text)
+    kwargs = {"audio": str(audio_path)}
+    if lang:
+        kwargs["language"] = lang
+    with _lock, gpu_lock, torch.inference_mode():
+        inputs = _processor.apply_transcription_request(**kwargs)
+        inputs = inputs.to(_model.device, _model.dtype)
+        output_ids = _model.generate(
+            **inputs,
+            max_new_tokens=MAX_NEW_TOKENS,
+            do_sample=False,
+        )
+        prompt_len = inputs["input_ids"].shape[1]
+        generated_ids = output_ids[:, prompt_len:]
+        return _parse_generated(generated_ids)
 
 
 def transcribe_wav(wav_path: Path, language: str | None, work_dir: Path) -> Transcript:

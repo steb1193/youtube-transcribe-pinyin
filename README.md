@@ -57,7 +57,7 @@ Cloud ASR is fine until the clip is private. Local models, LAN UI, no telemetry.
 |---|---|---|
 | Источник | YouTube, VK, прямые ссылки, загрузка файла | YouTube & [yt-dlp sites](https://github.com/yt-dlp/yt-dlp/blob/master/supportedsites.md), file upload |
 | Видео | только аудиодорожка (ffmpeg demux) | extract audio track, drop the picture |
-| ASR | [Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B), ~52 языка | multilingual speech recognition |
+| ASR | [Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf), ~52 языка | multilingual speech recognition |
 | Пиньинь | словарь `pypinyin` + CC-CEDICT, без GPU | hanzi → pinyin, dictionary not an LLM |
 | Перевод | Qwen2.5-1.5B-Instruct → русский, оффлайн | local translation, imperfect on purpose |
 | Сеть | `0.0.0.0:8080`, шаринг по LAN | share on the local network |
@@ -95,7 +95,7 @@ LAN: `http://<IPv4-этого-ПК>:8080`
 
 | Variable | Default | |
 |---|---|---|
-| `ASR_MODEL` | `Qwen/Qwen3-ASR-1.7B` | speech-to-text checkpoint |
+| `ASR_MODEL` | `Qwen/Qwen3-ASR-1.7B-hf` | speech-to-text checkpoint |
 | `TRANSLATE_MODEL` | `Qwen/Qwen2.5-1.5B-Instruct` | local translator |
 | `ASR_CHUNK_SEC` | `480` | нарезка длинных роликов / long-audio chunks |
 | `ASR_MAX_NEW_TOKENS` | `4096` | лимит генерации на кусок |

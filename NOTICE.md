@@ -18,9 +18,8 @@ YouTube Transcribe Pinyin’s **application code** is licensed under AGPL-3.0 (s
 
 | Checkpoint | Use | License (see the model card) |
 |---|---|---|
-| [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B) | Speech recognition | Apache-2.0 (card) |
+| [Qwen/Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf) | Speech recognition | Apache-2.0 (card) |
 | [Qwen/Qwen2.5-1.5B-Instruct](https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct) | Translation | Apache-2.0 (card) |
-| [`qwen-asr`](https://github.com/QwenLM/Qwen3-ASR) | ASR runtime | Apache-2.0 |
 
 Always re-check the Hugging Face model card before commercial use.
 

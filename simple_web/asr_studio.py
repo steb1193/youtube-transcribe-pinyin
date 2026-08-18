@@ -429,7 +429,7 @@ def _run_job(job_id: str, url: str, saved: Path | None, language: str, source_na
         } else "Нормализую звук…")
         wav = to_wav(saved, work / "audio.wav")
 
-        _update(job_id, stage="Расшифровываю (Qwen3-ASR-1.7B)…")
+        _update(job_id, stage="Расшифровываю (Qwen3-ASR-1.7B-hf)…")
         engine.set_progress("Расшифровываю…")
         with pipeline_lock:
             result = engine.transcribe_wav(wav, language, work)
@@ -508,7 +508,7 @@ def api_status():
     loading = asr["loading"] or llm["loading"]
     ready = asr["ready"]
     if asr["loading"]:
-        stage = "Загружаю Qwen3-ASR-1.7B…"
+        stage = "Загружаю Qwen3-ASR-1.7B-hf…"
     elif llm["loading"]:
         stage = "Загружаю Hy-MT2-7B…"
     else:

@@ -4,8 +4,8 @@ YouTube Transcribe Pinyin does **not** train anything. It downloads public check
 
 ## Speech · Qwen3-ASR-1.7B
 
-- Card: [Qwen/Qwen3-ASR-1.7B](https://huggingface.co/Qwen/Qwen3-ASR-1.7B)
-- Package: [`qwen-asr`](https://github.com/QwenLM/Qwen3-ASR) (transformers backend)
+- Card: [Qwen/Qwen3-ASR-1.7B-hf](https://huggingface.co/Qwen/Qwen3-ASR-1.7B-hf)
+- Runtime: Hugging Face `transformers>=5.13` (native Qwen3-ASR)
 - Role: language id + transcription (including long audio, chunked every `ASR_CHUNK_SEC` seconds)
 - Override: `ASR_MODEL` in `docker-compose.yml`
 

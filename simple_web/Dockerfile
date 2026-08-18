@@ -6,7 +6,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
     PORT=8080 \
     HOST=0.0.0.0 \
     DATA_DIR=/data \
-    ASR_MODEL=Qwen/Qwen3-ASR-1.7B \
+    ASR_MODEL=Qwen/Qwen3-ASR-1.7B-hf \
     TRANSLATE_MODEL=tencent/Hy-MT2-7B \
     TRANSLATE_BITS=8 \
     NVIDIA_VISIBLE_DEVICES=all \
@@ -14,6 +14,7 @@ ENV DEBIAN_FRONTEND=noninteractive \
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ffmpeg \
+        libsndfile1 \
         git \
         ca-certificates \
         curl \

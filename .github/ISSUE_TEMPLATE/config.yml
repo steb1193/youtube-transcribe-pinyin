@@ -5,4 +5,4 @@ contact_links:
     about: YouTube login, extractor broken, download fails — not YouTube Transcribe Pinyin
   - name: Qwen3-ASR
     url: https://github.com/QwenLM/Qwen3-ASR/issues
-    about: Model quality / CUDA inside qwen-asr
+    about: Model quality / CUDA inside transformers Qwen3-ASR

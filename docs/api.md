@@ -16,7 +16,7 @@ Model load state.
   "loading": false,
   "error": null,
   "device": "cuda:0 (NVIDIA GeForce RTX 3060)",
-  "model": "Qwen/Qwen3-ASR-1.7B",
+  "model": "Qwen/Qwen3-ASR-1.7B-hf",
   "translate_model": "Qwen/Qwen2.5-1.5B-Instruct",
   "translate_ready": true,
   "translate_error": null,
